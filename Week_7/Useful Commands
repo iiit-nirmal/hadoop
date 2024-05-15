@@ -1,0 +1,5 @@
+>>  habse shell -- To start the Hbase
+>> list  -- to list the tables
+>> service --status-all  -- to check services are running
+>> service hbase-master restart
+>> service hbase-regionserver restart 

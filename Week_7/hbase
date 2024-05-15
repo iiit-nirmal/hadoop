@@ -1,0 +1,71 @@
+>>  habse shell -- To start the Hbase
+>> list  -- to list the tables
+>> service --status-all  -- to check services are running
+>> service hbase-master restart
+>> service hbase-regionserver restart 
+>> exit -- to exist from hbase session
+
+
+>> create 'students','personal_details','contact_details','marks' 
+  -- To create students table with all required details 
+>> put 'students','student1','personal_details:name','Students'
+  -- To insert into table with rowKey 'student1' 
+>> scan 'students'
+  -- to scan the table 'students' 
+  -- 4 dimensions - Row Key, Column Family, Column, timestamp
+  -- Scan will give range of rows or all rows
+>> get 'students','student1'
+  -- To get specific row
+>> get 'students','student1',{COLUMN => 'personal_details'}
+>> get 'students','student1',{COLUMN => 'personal_details:name'}
+
+>> delete 'students','student1', 'personal_details:name'
+ -- To delete  'name' column from table
+>> describe 'students'
+ -- Description of table
+>> exists 'students'
+>> drop 'students'
+  -- table 'students' should be disabled first before dropping
+  -- when disabled , content of memstore related to table is flushed 
+    to disk 
+  -- disable 'students' / enable 'students'
+
+---------------------- Video 2 
+>> create 'census','personal','professional'
+>> put 'census',1,'personal:name','Mike Jones'
+   put 'census',1,'personal:marital_status', 'unmarried'
+   put 'census',1,'personal:gender', 'male'
+   put 'census',1,'personal:employed', 'yes'
+   put 'census',1,'personal:educational_level', 'high school'
+   put 'census',1,'personal:field', 'construction'
+
+   put 'census',2,'personal:name','Mike Fox'
+   put 'census',2,'personal:marital_status', 'unmarried'
+   put 'census',2,'personal:gender', 'male'
+   put 'census',2,'personal:employed', 'yes'
+   put 'census',2,'personal:educational_level', 'high school'
+   put 'census',2,'personal:field', 'software' 
+
+>> get 'census',1
+   to fetch rowkey based data
+>> get 'census',1,'personal'
+   to fetch column family data for a particular row key
+>> get 'census',1,'personal:name'
+
+>> scan 'census', {COLUMNS => ['personal:name']} 
+   to get name column for all records
+>> scan 'census', {COLUMNS => ['personal:name'],LIMIT => 1 , STARTROW => "2", STOPROW => "3"}
+ to get all colmn values with ROw KEY filters. STOPROW is excluded but STARTROE is included
+>> delete 'census',1,'personal:name'
+
+----- Filter
+>> scan 'census',{FILTER => "ValueFilter(=, 'binary:Mike Jones')"}
+   ValueFilter compares value with each row and retrurn if match is found
+>> scan 'census',{FILTER => "QualifierFilter(=, 'substring:Name')"}
+   Qualifier filters applies filter on column names
+>> scan 'census',{FILTER => "FamilyFilter(=, 'substring:Per')"}
+
+---- Count 
+>> count 'census'
+  to get count of rows or unique row keys
+   Filter on column family names

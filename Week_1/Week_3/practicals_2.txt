@@ -1,0 +1,169 @@
+------------------- Compression using (-z or --compress) default is gz
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--compress \
+--warehouse-dir /user/cloudera/compressresult
+
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--compression-codec BZip2Codec \
+--warehouse-dir /user/cloudera/compressresultWithCodec
+
+
+-------------------- column and where clause 
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--columns customer_id,customer_fname, customer_city \
+--where "order_status in ('complete','closed')"
+--warehouse-dir /user/cloudera/columnresults
+
+note : where clause conditions get also added in boundaryval query.
+
+------------------- boundary-query
+
+mysql -u root -p
+use retail_db;
+insert into orders values(200000,'2014-07-23 00:00:00',99999,'COMPLETE');
+
+-- Data skewness
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--warehouse-dir /user/cloudera/columnresults
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--boundary-query "select 1, 68883" \
+--warehouse-dir /user/cloudera/boundval
+
+delete from orders where order_id = 200000;
+
+
+------------------- split-by
+
+Note : split-by used when there is no primary key in table or primary key columb is not able to distribute the date among the mappers. 
+If there is no primary key in table , import will fail.
+It is better practicr to use an indexed field which do not contain null values as part of split-by.
+it is recommended to use split-by on numeric field column.
+to use split-by on non numeric field 
+  org.apache.sqoop.splitter.allow_text_splitter=true;
+
+
+create table orders_no_pk(
+order_id int(11) not null,
+order_date datetime not null,
+order_customer_id int(11) not null,
+order_status varchar(45) not null
+);
+
+insert into orders_no_pk select order_id , order_date , order_customer_id, order_status from orders;
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders_no_pk \
+--warehouse-dir /user/cloudera/ordersnoPK
+
+Job failed : 24/04/23 20:46:15 ERROR tool.ImportTool: Import failed: No primary key could be found for table orders_no_pk. Please specify one with --split-by or perform a sequential import with '-m 1'.
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders_no_pk \
+--split-by order_id \
+--warehouse-dir /user/cloudera/ordersnoPK
+
+-------------autoreset
+if table does not have primary key or split-by column is not specified in sqoop import 
+then job will fail . we can use --autoreset-to-one-mapper clause which reset no of mappers to 1
+if there is no primary key is table or no split-by clause.
+
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders_no_pk \
+--warehouse-dir /user/cloudera/autoreset
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders_no_pk \
+--autoreset-to-one-mapper \
+--warehouse-dir /user/cloudera/autoreset
+
+------------------Delimiters
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--fields-terminated-by '|' \
+--lines-terminated-by ',' \
+--warehouse-dir /user/cloudera/terminated 
+
+------------------ --verbose --> to generate more logs, Now I can see splits query , boundary-query
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--verbose \
+--warehouse-dir /user/cloudera/verbose
+
+-------------------- --append --> append the data to exisiting target-dir
+
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--append \
+--target-dir /queryresults
+
+-------------------- delete-targer-dir if exists
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--target-dir /queryresults \
+--delete-targer-dir 
+
+
+-------------------- dealing with nulls
+
+sqoop-import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table orders \
+--target-dir /queryresults \
+--null-non-string "-1"  \
+--null-string ""
+
+
+

@@ -1,0 +1,237 @@
+-------- sqoop export
+create table card_transactions (
+card_id bigint,
+member_id bigint,
+amount int(10),
+postcode int(10),
+transaction_dt varchar(255),
+status varchar(255),
+primary key (card_id, transaction_dt)
+);
+
+hadoop fs -mkdir /data 
+hadoop fs -copyFromLocal 
+
+
+sqoop-export \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table card_transactions \
+--export-dir /data/card_transactions-200913-220429.csv \
+--fields-terminated-by ',' \
+--verbose \
+
+Notes: Job Fail with use primary keys constraints not being followed  while exporting the data, export 
+partially loads the data to table causing inconsistency issue. This can be solved using staging table.
+
+staging table 
+
+create table card_transactions_staging (
+card_id bigint,
+member_id bigint,
+amount int(10),
+postcode int(10),
+transaction_dt varchar(255),
+status varchar(255),
+primary key (card_id, transaction_dt)
+);
+
+
+sqoop-export \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table card_transactions \
+--export-dir /data/card_transactions-200913-220429.csv \
+--staging-table card_transactions_staging \
+--fields-terminated-by ',' \
+--verbose 
+
+create table card_transactions (
+transaction_id int(10),
+card_id bigint,
+member_id bigint,
+amount int(10),
+postcode int(10),
+transaction_dt varchar(255),
+status varchar(255),
+primary key (transaction_id)
+);
+
+
+create table card_transactions_stage (
+transaction_id int(10),
+card_id bigint,
+member_id bigint,
+amount int(10),
+postcode int(10),
+transaction_dt varchar(255),
+status varchar(255),
+primary key (transaction_id)
+);
+
+sqoop-export \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table card_transactions \
+--export-dir /data/card_trans.csv \
+--fields-terminated-by ',' 
+
+
+sqoop-export \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table card_transactions \
+--export-dir /data/card_trans.csv \
+--staging-table card_transactions_staging\
+--fields-terminated-by ',' 
+
+note : Data is first written to staging table if  job succeed then data is written to final table and records from staging table would be deleted . In case of job fails then data is only written in staging table , no data would be written in final table.
+
+------------------------------------------------- Sqoop job  
+
+create table member_details(
+card_id bigint,
+member_id bigint,
+member_joining_date timestamp,
+card_purchase_dt varchar(255),
+country varchar(255),
+city varchar(255),
+primary key(card_id)
+);
+hadoop fs -put ~/Desktop/shared/cardmembers.csv /data
+
+hadoop fs -put ~/Desktop/shared/cardmembers.csv /data
+
+sqoop-export \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table member_details \
+--staging-table member_details_stage \
+--export-dir /data/cardmembers.csv \
+--fields-terminated-by ','
+
+sqoop job \
+--create job_banking_member_deatils \
+-- import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--password cloudera \
+--table member_details \
+--warehouse-dir /data/banking \
+--incremental append \
+--check-column card_id \
+--last-value 0
+
+
+sqoop job --list 
+
+
+--------- sqoop incremental
+
+sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password cloudera \
+--table orders \
+--warehouse-dir /data \
+--incremental append \
+--check-column order_id \
+--last-value 0
+
+insert into orders values(68884,'2014-07-23 00:00:00',5522,'COMPLETE');
+insert into orders values(68885,'2014-07-23 00:00:00',5522,'COMPLETE');
+insert into orders values(68886,'2014-07-23 00:00:00',5522,'COMPLETE');
+insert into orders values(68887,'2014-07-23 00:00:00',5522,'COMPLETE');
+insert into orders values(68888,'2014-07-23 00:00:00',5522,'COMPLETE');
+insert into orders values(68889,'2014-07-23 00:00:00',5522,'COMPLETE');
+
+
+
+sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password cloudera \
+--table orders \
+--warehouse-dir /data \
+--incremental append \
+--check-column order_id \
+--last-value 68883
+
+sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password cloudera \
+--table orders \
+--warehouse-dir /data/lastmodified \
+--incremental lastmodified \
+--check-column order_date \
+--last-value 0 \
+--append
+
+
+insert into orders values(68890,current_timestamp,5523,'COMPLETE');
+insert into orders values(68891,current_timestamp,5523,'COMPLETE');
+insert into orders values(68892,current_timestamp,5523,'COMPLETE');
+insert into orders values(68893,current_timestamp,5523,'COMPLETE');
+insert into orders values(68894,current_timestamp,5523,'COMPLETE');
+update orders set order_status='COMPLETE' and order_date =
+current_timestamp WHERE ORDER_ID = 68862;
+commit;
+
+
+sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password cloudera \
+--table orders \
+--warehouse-dir /data \
+--incremental lastmodified \
+--check-column order_date \
+--last-value '2024-04-125 11:11:02' \
+--append
+
+---------------- sqoop merge in case of duplicate data because of lastmodified incremental
+note : merge tool will trigger Map and reduce job with reduce being 1 thus creating one reducer output file 
+
+ sqoop-import \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password cloudera \
+--table orders \
+--warehouse-dir /data \
+--incremental lastmodified \
+--check-column order_date \
+--last-value '2024-04-125 11:11:02' \
+--merge-key order_id
+
+
+----------------------------------------------------------- sqoop password management 
+echo -n "cloudera" >> .password-file
+
+sqoop job \
+--create job_banking_member_deatils_pass \
+-- import \
+--connect "jdbc:mysql://quickstart.cloudera:3306/retail_db" \
+--username retail_dba \
+--table member_details \
+--warehouse-dir /data/banking_password \
+--incremental append \
+--password-file file:///home/cloudera/Desktop/.password-file \
+--check-column card_id \
+--last-value 0
+
+
+
+hadoop credential create mysql.password -provider jceks://hdfs/user/cloudera/mysql.password.jceks
+
+sqoop eval \
+-Dhadoop.security.credential.provider.path=jceks://hdfs/user/cloudera/mysql.password.jceks \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password-alias mysql.password \
+--query "select count(*) from orders"
